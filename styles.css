@@ -1,0 +1,57 @@
+/* Base Styles (Applies to all screens, especially desktop/large screens) */
+
+body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+header, footer {
+    background-color: #333;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+/* Use Flexbox for the row container */
+.row {
+    display: flex; /* Enables flex container properties */
+    flex-wrap: wrap; /* Allows columns to wrap if necessary */
+    padding: 10px;
+    max-width: 1200px;
+    margin: 0 auto; /* Centers the content */
+}
+
+/* Desktop Layout: Three equal columns side-by-side */
+.column {
+    /* flex: 1 means the column takes up an equal share of the available space */
+    flex: 1; 
+    padding: 20px;
+    margin: 10px;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    min-width: 250px; /* Prevents columns from getting too narrow before stacking */
+}
+
+/* 🚀 Media Query for Mobile Devices */
+/* This rule applies when the screen width is 600px or less. */
+
+@media screen and (max-width: 600px) {
+    
+    /* Change the flex direction to stack the columns vertically */
+    .row {
+        flex-direction: column;
+        padding: 5px;
+    }
+    
+    /* On mobile, columns take up the full width (100%) */
+    .column {
+        flex: 0 0 100%; /* Overrides the flex: 1 setting */
+        margin: 10px 0;
+    }
+    
+    header h1 {
+        font-size: 1.5em; /* Adjust font size for better mobile display */
+    }
+}
