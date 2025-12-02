@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Crystal Miner (Inventory Added)</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #eee;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        h1 { margin: 10px 0; font-size: 20px; color: #ffd700; }
+
+        #game-wrapper {
+            position: relative;
+            border: 4px solid #555;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        canvas {
+            display: block;
+            background-color: #87CEEB; /* Sky */
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            flex-wrap: wrap; /* Allow stats to wrap if screen is small */
+        }
+
+        .stat { 
+            font-weight: bold; 
+            text-shadow: 1px 1px 0 #000; 
+            font-size: 16px;
+            padding-right: 15px;
+        }
+        
+        .val { color: #ffd700; }
+        .health-val { color: #ff0000; } 
+        .energy-val { color: #00e676; }
+
+        /* Modal Base Style */
+        .modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #2b2b2b;
+            border: 2px solid #FFA726; 
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+            z-index: 10;
+            width: 380px;
+            box-shadow: 0 0 30px black;
+        }
+
+        .modal h2 { margin-top: 0; color: #FFA726; }
+        
+        /* Shop Modal specific styles */
+        #shop-modal { border-color: #FFA726; }
+
+        /* Inventory Modal specific styles */
+        #inventory-modal { 
+            border-color: #81D4FA; 
+            width: 300px;
+            text-align: left;
+        }
+        #inventory-modal h2 { color: #81D4FA; text-align: center; }
+
+        #inventory-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+        
+        .inventory-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #444;
+        }
+
+        .item-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .item-icon-container {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            position: relative;
+            background-color: #444;
+            border: 1px solid #666;
+        }
+
+        .item-count {
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+
+        button {
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            padding: 12px;
+            margin: 8px 0;
+            cursor: pointer;
+            width: 100%;
+            font-family: inherit;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+        .btn-lvl { color: #FFA726; }
+        .btn-craft { color: #81D4FA; }
+        .btn-disabled { background-color: #888; cursor: not-allowed; }
+
+        button:hover:not(.btn-disabled) { background: #666; border-color: #aaa; }
+        button:active:not(.btn-disabled) { background: #888; }
+
+        #controls-hint {
+            margin-top: 10px;
+            color: #888;
+            font-size: 14px;
+        }
+        
+        #message-area {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            width: 100%;
+        }
+        #ui-blocks-mined {
+             color: #00E5FF; 
+        }
+        #ui-pickaxe-level {
+             color: #81D4FA; 
+        }
+    </style>
+</head>
+<body>
+
+    <h1>CRYSTAL MINER (INVENTORY ADDED)</h1>
+    
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="ui-layer">
+            <div class="stat">CASH: $<span id="ui-money" class="val">100</span></div>
+            <div class="stat">HEALTH: <span id="ui-health" class="health-val">100</span></div>
+            <div class="stat">ENERGY: <span id="ui-energy" class="energy-val">100</span> / <span id="ui-max-energy">100</span></div>
+            <div class="stat">WEIGHT: <span id="ui-weight">0</span></div>
+            <div class="stat">PICKAXE: <span id="ui-pickaxe-level">Stone</span></div>
+            <div class="stat">MINED: <span id="ui-blocks-mined">0</span> / 10</div>
+            <div class="stat">DEPTH: <span id="ui-depth">0</span>m</div>
+        </div>
+
+        <div id="message-area"></div>
+
+        <div id="inventory-modal" class="modal">
+            <h2>INVENTORY</h2>
+            <p>Total Weight: <span id="inventory-weight">0</span></p>
+            <hr style="border-color: #555;">
+            <ul id="inventory-list">
+                </ul>
+            <button onclick="game.closeInventory()" style="background:#26547C;">CLOSE [I]</button>
+        </div>
+        
+        <div id="shop-modal" class="modal">
+            <h2>UPGRADE HOUSE</h2>
+            <p>Cash Available: $<span id="shop-money">0</span></p>
+            <hr style="border-color: #555;">
+            
+            <h3>PICKAXE CRAFTING</h3>
+            <div id="pickaxe-upgrades">
+                </div>
+            <hr style="border-color: #555;">
+            
+            <h3>GENERAL UPGRADES</h3>
+            
+            <button onclick="game.upgradeTank()">
+                UPGRADE BATTERY (Lvl <span class="btn-lvl" id="lvl-tank">1</span>) | Cost: $<span id="cost-tank">50</span><br>
+                <span style="font-size:11px; font-weight:normal; color:#aaa">Increases maximum energy capacity.</span>
+            </button>
+
+            <button onclick="game.upgradeScanner()">
+                UPGRADE SCANNER (Lvl <span class="btn-lvl" id="lvl-scanner">0</span>) | Cost: $<span id="cost-scanner">300</span><br>
+                <span style="font-size:11px; font-weight:normal; color:#aaa">Increases visibility radius (Max 5 blocks).</span>
+            </button>
+            
+            <button onclick="game.upgradeLuck()">
+                UPGRADE LUCK (Lvl <span class="btn-lvl" id="lvl-luck">1</span>) | Cost: $<span id="cost-luck">100</span><br>
+                <span style="font-size:11px; font-weight:normal; color:#aaa">Higher chance to find rare diamonds deeper down.</span>
+            </button>
+            
+            <button onclick="game.upgradeLoot()">
+                UPGRADE LOOT (Lvl <span class="btn-lvl" id="lvl-loot">1</span>) | Cost: $<span id="cost-loot">100</span><br>
+                <span style="font-size:11px; font-weight:normal; color:#aaa">Increases cash multiplier when selling ore.</span>
+            </button>
+
+            <button onclick="game.closeShop()" style="background:#822; margin-top:15px;">LEAVE HOUSE [S]</button>
+        </div>
+    </div>
+
+    <div id="controls-hint">
+        ARROWS to Move/Aim &nbsp;|&nbsp; SPACE to Drill &nbsp;|&nbsp; **E** to Sell &nbsp;|&nbsp; **S** for Upgrades &nbsp;|&nbsp; **I** for Inventory
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Configuration ---
+        const TILE_SIZE = 40;
+        const WORLD_WIDTH = 20;  
+        const WORLD_HEIGHT = 150; 
+        const SURFACE_HEIGHT = 5; 
+        const BASE_VISIBILITY_RADIUS = 1; 
+        const BOMB_DAMAGE = 75; 
+
+        // --- Survival & Movement Constants ---
+        const ENERGY_LOSS_PER_MOVE = 0.5; 
+        const HEALTH_LOSS_ON_ENERGY_DEPLETION = 2.0; 
+        const INITIAL_HEALTH = 100;
+        const HEALTH_RESTORE_PERCENT = 0.10; 
+        const MINE_COUNT_REQUIRED_FOR_HEAL = 10; 
+        const MAX_SCANNER_LEVEL = 4;
+        
+        // Structure IDs
+        const STRUCTURE_ID_SELL = 10;
+        const STRUCTURE_ID_UPGRADE = 11;
+        const STRUCTURE_ID_REST = 12;
+        
+        // Pickaxe Configuration
+        const PICKAXE_NAMES = { 1: 'Stone', 2: 'Copper', 3: 'Iron', 4: 'Steel' };
+        const PICKAXE_BREAKING_POWER = { 
+            1: 1, 
+            2: 2, 
+            3: 3, 
+        };
+
+        const ORES = {
+            AIR: { id: -2, color: '#87CEEB', val: 0, hardness: 0, weight: 0, name: 'Air' }, 
+            UNEXPLORED: { id: -1, color: '#313131', val: 0, hardness: 0, weight: 0, name: 'Unexplored' }, 
+            DIRT: { id: 0, name: 'Dirt', val: 0, hardness: 1, weight: 0, color: '#964B00' },
+            STONE: { id: 1, name: 'Stone', val: 2, hardness: 1, weight: 1, color: '#808080' },
+            COAL: { id: 7, name: 'Coal', val: 5, hardness: 1, weight: 1, color: '#101010' }, 
+            COPPER: { id: 2, name: 'Copper', val: 10, hardness: 2, weight: 3, color: '#B76E79' }, 
+            IRON: { id: 3, name: 'Iron', val: 25, hardness: 3, weight: 5, color: '#8D6E63' }, 
+            GOLD: { id: 4, name: 'Gold', val: 100, hardness: 4, weight: 8, color: '#FFD700' }, 
+            RUBY: { id: 5, name: 'Ruby', val: 250, hardness: 6, weight: 12, color: '#D50000' }, 
+            DIAMOND: { id: 6, name: 'Diamond', val: 750, hardness: 8, weight: 18, color: '#00E5FF' }, 
+            BOMB: { id: 8, name: 'Bomb', val: 0, hardness: 5, weight: 0, color: '#8b0000' }, 
+            BEDROCK: { id: 99, name: 'Bedrock', val: 0, hardness: 999, weight: 0, color: '#000000' }
+        };
+        
+        const STRUCTURES = {
+            GROUND: { id: 9, name: 'Ground', color: '#4CAF50' }, 
+            SELLER: { id: STRUCTURE_ID_SELL, name: 'Sell Table', color: '#B39DDB' }, 
+            UPGRADE: { id: STRUCTURE_ID_UPGRADE, name: 'Upgrade House', color: '#FFA726' }, 
+            REST: { id: STRUCTURE_ID_REST, name: 'Rest House', color: '#66BB6A' },
+        };
+        
+        // Crafting Blueprints
+        const PICKAXE_BLUEPRINTS = [
+            { 
+                level: 2, 
+                name: 'Copper Pickaxe',
+                requirements: [
+                    { material: ORES.COPPER, qty: 15 }, 
+                    { material: ORES.COAL, qty: 5 } 
+                ],
+                cashCost: 50, 
+            },
+            { 
+                level: 3, 
+                name: 'Iron Pickaxe',
+                requirements: [
+                    { material: ORES.IRON, qty: 50 }
+                ],
+                cashCost: 500, 
+            }
+        ];
+
+        const TOTAL_WORLD_HEIGHT = WORLD_HEIGHT + SURFACE_HEIGHT + 1;
+
+        class Game {
+            constructor() {
+                this.grid = []; 
+                this.visibleGrid = []; 
+                this.paused = false;
+                this.cameraY = 0;
+                this.msgTimer = null;
+
+                // Player State
+                this.player = {
+                    x: 2,
+                    y: SURFACE_HEIGHT, 
+                    facing: { x: 0, y: 1 },
+                    money: 100,
+                    health: INITIAL_HEALTH, 
+                    energy: 100,
+                    maxEnergy: 100,
+                    inventory: [], 
+                    
+                    pickaxeLevel: 1, 
+                    tankLevel: 1,
+                    luckLevel: 1, 
+                    lootLevel: 1,
+                    scannerLevel: 0,
+                    
+                    blocksMinedSinceRest: 0, 
+                };
+
+                this.costs = { 
+                    tank: 50, 
+                    luck: 100, 
+                    loot: 100, 
+                    scanner: 300 
+                }; 
+                this.scanner_cost_multiplier = 2.0; 
+
+                this.generateWorld();
+                this.updateVisibility(); 
+                this.setupInputs();
+                
+                this.lastTime = 0;
+                requestAnimationFrame(this.gameLoop.bind(this));
+            }
+
+            generateWorld() {
+                for (let y = 0; y < TOTAL_WORLD_HEIGHT; y++) {
+                    let row = [];
+                    for (let x = 0; x < WORLD_WIDTH; x++) {
+                        if (y < SURFACE_HEIGHT) {
+                            row.push(ORES.AIR); 
+                        } else if (y === SURFACE_HEIGHT) {
+                            if (x === 4) { row.push(STRUCTURES.SELLER); }
+                            else if (x === 15) { row.push(STRUCTURES.REST); }
+                            else if (x === 18) { row.push(STRUCTURES.UPGRADE); }
+                            else { row.push(STRUCTURES.GROUND); }
+                        } else if (y === TOTAL_WORLD_HEIGHT - 1) {
+                            row.push(ORES.BEDROCK);
+                        } else {
+                            // Store the base ore type AND its current durability
+                            const baseOre = this.calculateOre(y - SURFACE_HEIGHT);
+                            row.push({
+                                type: baseOre,
+                                currentHardness: baseOre.hardness,
+                                id: baseOre.id 
+                            }); 
+                        }
+                    }
+                    this.grid.push(row);
+                    this.visibleGrid.push(Array(WORLD_WIDTH).fill(ORES.UNEXPLORED));
+                }
+            }
+
+            calculateOre(depth) {
+                const r = Math.random();
+                const deepMod = depth * 0.003; 
+                const luckFactor = this.player.luckLevel * 0.0005;
+
+                // Logic for Bomb placement
+                if (depth >= 15 && r > 0.999 - (deepMod * 0.5)) return ORES.BOMB; 
+
+                // New logic to include Coal
+                if (depth < 10) { 
+                    if (r > 0.95) return ORES.STONE;
+                    if (r > 0.85) return ORES.COAL; 
+                    return ORES.DIRT;
+                }
+
+                if (r > 0.995 - deepMod - luckFactor) return ORES.DIAMOND;
+                if (r > 0.98 - deepMod) return ORES.RUBY;
+                if (r > 0.94 - deepMod) return ORES.GOLD;
+                if (r > 0.88 - deepMod) return ORES.IRON;
+                if (r > 0.75 - deepMod) return ORES.COPPER; 
+                if (r > 0.60 - deepMod) return ORES.COAL; 
+                if (r > 0.40) return ORES.STONE;
+                return ORES.DIRT;
+            }
+
+            // Helper to get the count of a specific item in inventory
+            getInventoryCount(oreType) {
+                return this.player.inventory.filter(item => item.id === oreType.id).length;
+            }
+            
+            // Helper to remove items from inventory (used in crafting)
+            removeItemsFromInventory(oreType, count) {
+                let itemsToRemove = count;
+                const newInventory = [];
+                for (const item of this.player.inventory) {
+                    if (item.id === oreType.id && itemsToRemove > 0) {
+                        itemsToRemove--;
+                    } else {
+                        newInventory.push(item);
+                    }
+                }
+                this.player.inventory = newInventory;
+            }
+
+            // Group inventory items by type for display
+            getGroupedInventory() {
+                const counts = {};
+                this.player.inventory.forEach(item => {
+                    if (item.val > 0) { // Only count sellable ore
+                        counts[item.id] = (counts[item.id] || { type: item, count: 0 });
+                        counts[item.id].count++;
+                    }
+                });
+
+                // Convert object values to an array, ensuring a fixed display order
+                const sortedKeys = Object.keys(ORES).map(key => ORES[key].id).filter(id => id > 0 && id !== ORES.BOMB.id).sort((a, b) => a - b);
+                
+                return sortedKeys.map(id => counts[id]).filter(Boolean);
+            }
+
+
+            setupInputs() {
+                window.addEventListener('keydown', (e) => {
+                    const key = e.key.toLowerCase();
+                    
+                    if (key === 'i') {
+                        this.toggleInventory();
+                        return;
+                    }
+
+                    if (this.paused && key !== 's') return;
+
+                    switch(key) {
+                        case 'arrowup': this.tryMove(0, -1); break;
+                        case 'arrowdown': this.tryMove(0, 1); break;
+                        case 'arrowleft': this.tryMove(-1, 0); break;
+                        case 'arrowright': this.tryMove(1, 0); break;
+                        case ' ': 
+                            e.preventDefault(); 
+                            this.drill(); 
+                            break;
+                        case 'e':
+                            this.interact();
+                            break;
+                        case 's':
+                            this.toggleShop();
+                            break;
+                    }
+                });
+            }
+
+            tryMove(dx, dy) {
+                this.player.facing = { x: dx, y: dy };
+
+                const tx = this.player.x + dx;
+                const ty = this.player.y + dy;
+
+                if (tx < 0 || tx >= WORLD_WIDTH || ty < 0 || ty >= TOTAL_WORLD_HEIGHT) return;
+
+                const targetTile = this.grid[ty][tx];
+
+                // Check for Air, or Surface Structures
+                if (targetTile.type === ORES.AIR || targetTile.id >= STRUCTURES.GROUND.id) {
+                    
+                    if (targetTile.type === ORES.AIR) {
+                        this.player.energy -= ENERGY_LOSS_PER_MOVE;
+                        this.checkEnergy(); 
+                    }
+                    
+                    this.player.x = tx;
+                    this.player.y = ty;
+                    this.checkInteraction(targetTile);
+                    this.updateVisibility(); 
+                }
+            }
+            
+            checkEnergy() {
+                if (this.player.energy <= 0) {
+                    this.player.energy = 0;
+                    
+                    if (this.player.y > SURFACE_HEIGHT) {
+                        this.player.health -= HEALTH_LOSS_ON_ENERGY_DEPLETION;
+                        this.showMessage(`ENERGY DEPLETED! Lost ${HEALTH_LOSS_ON_ENERGY_DEPLETION.toFixed(1)} Health!`, "#ff4444");
+                        
+                        if (this.player.health <= 0) {
+                            this.revive();
+                        } else {
+                            this.player.y = Math.max(SURFACE_HEIGHT, this.player.y - 1); 
+                        }
+                    } else {
+                        this.showMessage("ENERGY DEPLETED! Return to Rest House.", "#ff4444");
+                    }
+                } else if (this.player.energy < 0) {
+                    this.player.energy = 0;
+                }
+            }
+
+            revive() {
+                this.player.health = INITIAL_HEALTH;
+                this.player.energy = this.player.maxEnergy;
+                this.player.x = 2; 
+                this.player.y = SURFACE_HEIGHT; 
+                this.player.blocksMinedSinceRest = 0; 
+                
+                const lostItems = this.player.inventory.length;
+                this.player.inventory = [];
+                
+                this.showMessage(`CRITICAL FAILURE! Lost ${lostItems} items. Revived at surface.`, "#FFA726");
+                this.updateVisibility();
+            }
+            
+            get totalWeight() {
+                return this.player.inventory.reduce((sum, item) => sum + item.weight, 0);
+            }
+
+            // --- Core Drilling Logic ---
+            drill() {
+                const tx = this.player.x + this.player.facing.x;
+                const ty = this.player.y + this.player.facing.y;
+
+                if (tx < 0 || tx >= WORLD_WIDTH || ty >= TOTAL_WORLD_HEIGHT || ty < 0) return;
+
+                const targetTile = this.grid[ty][tx];
+
+                if (targetTile.type === ORES.AIR) return;
+                
+                if (targetTile.type === ORES.BEDROCK || (targetTile.id >= STRUCTURES.GROUND.id && ty === SURFACE_HEIGHT)) {
+                    this.showMessage("Indestructible!", "#ff4444");
+                    return;
+                }
+
+                // Energy cost calculation
+                let baseCost = 1.0; 
+                // Weight penalty: 3% of total inventory weight added to base cost
+                const inventoryPenalty = this.totalWeight * 0.03; 
+                let finalCost = baseCost + inventoryPenalty;
+
+
+                if (this.player.energy >= finalCost) {
+                    this.player.energy -= finalCost;
+                    
+                    // Pickaxe damage calculation
+                    const pickaxePower = PICKAXE_BREAKING_POWER[this.player.pickaxeLevel] || 1;
+                    let damage = pickaxePower;
+
+                    // Reduce hardness based on pickaxe power
+                    targetTile.currentHardness -= damage;
+                    
+                    this.showMessage(`Hit ${targetTile.type.name}! (${Math.max(0, targetTile.currentHardness).toFixed(0)} hits left)`, targetTile.type.color);
+
+                    // Check if the block is broken
+                    if (targetTile.currentHardness <= 0) {
+                        
+                        const brokenOre = targetTile.type;
+                        
+                        // --- BOMB DETONATION LOGIC ---
+                        if (brokenOre === ORES.BOMB) {
+                            this.player.health -= BOMB_DAMAGE;
+                            this.showMessage(`*** BOMB DETONATED! -${BOMB_DAMAGE} Health ***`, "#ff0000");
+                            if (this.player.health <= 0) {
+                                this.revive();
+                            }
+                        } else if (brokenOre.val > 0 || brokenOre === ORES.STONE || brokenOre === ORES.DIRT) {
+                            // Collect any block that isn't air, bedrock, or bomb
+                            this.player.inventory.push(brokenOre);
+                            this.showMessage(`+ ${brokenOre.name} (W: ${this.totalWeight.toFixed(0)})`, brokenOre.color);
+                        } else {
+                            this.showMessage(`Dug ${brokenOre.name}.`, brokenOre.color);
+                        }
+                        
+                        // Replace broken block with air
+                        this.grid[ty][tx] = { type: ORES.AIR, id: ORES.AIR.id }; 
+                        this.visibleGrid[ty][tx] = ORES.AIR;
+                        
+                        // Increment blocks mined counter (only if we break it and it's not air)
+                        this.player.blocksMinedSinceRest++;
+                    }
+
+                } else {
+                    this.checkEnergy(); 
+                }
+                this.updateVisibility(); 
+            }
+
+            interact() {
+                const currentTile = this.grid[this.player.y][this.player.x];
+                
+                if (currentTile.id === STRUCTURE_ID_SELL) {
+                    this.sellAll();
+                } else {
+                    this.showMessage("Nothing to interact with here (Press E on Sell Table).", "#fff");
+                }
+            }
+            
+            checkInteraction(tile) {
+                if (tile.id === STRUCTURE_ID_SELL) {
+                    this.showMessage("Sell Table: Press 'E' to Sell All Ore.", STRUCTURES.SELLER.color);
+                } else if (tile.id === STRUCTURE_ID_UPGRADE) {
+                    this.showMessage("Upgrade House: Press 'S' to see upgrades.", STRUCTURES.UPGRADE.color);
+                } else if (tile.id === STRUCTURE_ID_REST) {
+                    
+                    // Energy is always restored
+                    this.player.energy = this.player.maxEnergy;
+
+                    const blocksNeeded = MINE_COUNT_REQUIRED_FOR_HEAL;
+                    
+                    if (this.player.blocksMinedSinceRest >= blocksNeeded) {
+                        const healthRestored = INITIAL_HEALTH * HEALTH_RESTORE_PERCENT;
+                        this.player.health = Math.min(INITIAL_HEALTH, this.player.health + healthRestored);
+                        this.player.blocksMinedSinceRest = 0; // Reset counter after heal
+                        this.showMessage(`Rest House: Energy Restored! Health Healed by ${healthRestored.toFixed(0)}!`, STRUCTURES.REST.color);
+                    } else {
+                        const required = blocksNeeded - this.player.blocksMinedSinceRest;
+                        this.showMessage(`Rest House: Energy Restored! Mine ${required} more blocks for Health Heal.`, STRUCTURES.REST.color);
+                    }
+                }
+            }
+            
+            // --- Visibility (Fog of War) ---
+            updateVisibility() {
+                const effectiveScannerLevel = Math.min(this.player.scannerLevel, MAX_SCANNER_LEVEL); 
+                const R = BASE_VISIBILITY_RADIUS + effectiveScannerLevel; 
+                const Px = this.player.x;
+                const Py = this.player.y;
+
+                for (let y = 0; y < TOTAL_WORLD_HEIGHT; y++) {
+                    for (let x = 0; x < WORLD_WIDTH; x++) {
+                        
+                        const dx = Math.abs(x - Px);
+                        const dy = Math.abs(y - Py);
+
+                        const actualTile = this.grid[y][x];
+                        
+                        if (y < SURFACE_HEIGHT) {
+                            this.visibleGrid[y][x] = ORES.AIR;
+                        } else if (y === SURFACE_HEIGHT) {
+                             // Structures are simple objects with id, or have a .type property
+                             this.visibleGrid[y][x] = actualTile.type || actualTile; 
+                        } else if (dx <= R && dy <= R) {
+                            this.visibleGrid[y][x] = actualTile.type;
+                        } else {
+                            if (actualTile.type !== ORES.AIR) {
+                                this.visibleGrid[y][x] = ORES.UNEXPLORED;
+                            } else {
+                                this.visibleGrid[y][x] = ORES.AIR;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // --- Shop/Upgrade Logic ---
+
+            toggleShop() {
+                const currentTile = this.grid[this.player.y][this.player.x];
+                
+                if (this.player.y === SURFACE_HEIGHT && currentTile.id === STRUCTURE_ID_UPGRADE) {
+                    const modal = document.getElementById('shop-modal');
+                    if (this.paused) {
+                        this.closeShop();
+                    } else {
+                        this.paused = true;
+                        this.closeInventory(); // Close inventory if open
+                        this.updateShopUI();
+                        this.drawPickaxeUpgrades(); 
+                        modal.style.display = 'block';
+                    }
+                } else if (!this.paused) {
+                    this.showMessage("Must be in the Upgrade House to access!", STRUCTURES.UPGRADE.color);
+                }
+            }
+
+            closeShop() {
+                document.getElementById('shop-modal').style.display = 'none';
+                this.paused = false;
+            }
+
+            // --- Inventory Logic ---
+            toggleInventory() {
+                const modal = document.getElementById('inventory-modal');
+                if (modal.style.display === 'block') {
+                    this.closeInventory();
+                } else {
+                    this.paused = true;
+                    this.closeShop(); // Close shop if open
+                    this.drawInventory();
+                    modal.style.display = 'block';
+                }
+            }
+
+            closeInventory() {
+                document.getElementById('inventory-modal').style.display = 'none';
+                this.paused = false;
+            }
+
+            drawInventory() {
+                const list = document.getElementById('inventory-list');
+                const grouped = this.getGroupedInventory();
+                list.innerHTML = '';
+                
+                document.getElementById('inventory-weight').innerText = this.totalWeight.toFixed(0);
+
+                if (grouped.length === 0) {
+                    list.innerHTML = `<li style="text-align:center; color:#888;">Inventory is empty.</li>`;
+                    return;
+                }
+
+                grouped.forEach(item => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'inventory-item';
+                    
+                    // Create Icon Container
+                    const iconContainer = document.createElement('div');
+                    iconContainer.className = 'item-icon-container';
+                    
+                    // Create a temporary canvas for drawing the icon (miniaturized)
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = TILE_SIZE;
+                    tempCanvas.height = TILE_SIZE;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    
+                    this.drawOreIcon(tempCtx, 0, 0, item.type);
+
+                    // Append the icon to the container
+                    iconContainer.appendChild(tempCanvas);
+                    
+                    // Item Info (Name, Value)
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'item-info';
+                    infoDiv.innerHTML = `
+                        ${iconContainer.outerHTML}
+                        <div>
+                            <strong>${item.type.name}</strong> 
+                            <span style="font-size:12px; color:#aaa;">($${item.type.val} ea)</span>
+                        </div>
+                    `;
+
+                    // Count
+                    const countSpan = document.createElement('span');
+                    countSpan.className = 'item-count';
+                    countSpan.innerText = `x${item.count}`;
+                    
+                    listItem.appendChild(infoDiv);
+                    listItem.appendChild(countSpan);
+                    list.appendChild(listItem);
+                });
+            }
+            
+            drawOreIcon(ctx, px, py, tile) {
+                // This function is a clone of the drawing logic in the main draw() function,
+                // but adapted to draw at specific coordinates (px, py) on the temporary canvas.
+
+                ctx.fillStyle = tile.color;
+                ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = "rgba(0,0,0,0.2)";
+                ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+
+
+                if (tile === ORES.STONE) {
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.2)"; 
+                    ctx.beginPath();
+                    ctx.moveTo(px + 5, py + 5);
+                    ctx.lineTo(px + 15, py + 10);
+                    ctx.lineTo(px + 10, py + 25);
+                    ctx.lineTo(px + 35, py + 30);
+                    ctx.lineTo(px + 25, py + 15);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.strokeStyle = "rgba(0,0,0,0.3)"; 
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(px + 10, py + 30);
+                    ctx.lineTo(px + 30, py + 10);
+                    ctx.stroke();
+                } else if (tile === ORES.COAL) {
+                    ctx.fillStyle = "rgba(0,0,0,0.6)";
+                    ctx.beginPath();
+                    ctx.arc(px + 10, py + 12, 6, 0, Math.PI * 2); ctx.fill();
+                    ctx.arc(px + 30, py + 20, 7, 0, Math.PI * 2); ctx.fill();
+                    ctx.arc(px + 18, py + 28, 5, 0, Math.PI * 2); ctx.fill();
+                    ctx.arc(px + 25, py + 10, 4, 0, Math.PI * 2); ctx.fill();
+                } else if (tile === ORES.COPPER) {
+                    const color = ORES.COPPER.color; 
+                    const shade1 = "#8A545E"; 
+                    const shade2 = "#D68D99"; 
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 22, 24, 8);
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 22, 3, 8); 
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 15, 24, 8);
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 15, 3, 8); 
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 8, 24, 8);
+                    ctx.fillStyle = shade2;
+                    ctx.fillRect(px + 8, py + 8, 24, 2); 
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 8, 3, 8); 
+                } else if (tile === ORES.IRON) {
+                    const color = "#aaa";
+                    const shade1 = "#777";
+                    const shade2 = "#ccc";
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 22, 24, 8);
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 22, 3, 8); 
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 15, 24, 8);
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 15, 3, 8); 
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 8, 24, 8);
+                    ctx.fillStyle = shade2;
+                    ctx.fillRect(px + 8, py + 8, 24, 2); 
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 8, 3, 8); 
+                } else if (tile === ORES.GOLD) {
+                    const color = "#FFD700";
+                    const shade1 = "#CCAA00";
+                    const shade2 = "#FFEEA0";
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 22, 24, 8);
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 22, 3, 8); 
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 15, 24, 8);
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 15, 3, 8); 
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(px + 8, py + 8, 24, 8);
+                    ctx.fillStyle = shade2;
+                    ctx.fillRect(px + 8, py + 8, 24, 2); 
+                    ctx.fillStyle = shade1;
+                    ctx.fillRect(px + 32, py + 8, 3, 8); 
+                } else if (tile === ORES.RUBY) {
+                    ctx.fillStyle = "#D50000";
+                    ctx.beginPath();
+                    ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, 12, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+                    ctx.beginPath();
+                    ctx.arc(px + 15, py + 15, 5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(px + TILE_SIZE / 2, py + 10);
+                    ctx.lineTo(px + TILE_SIZE - 10, py + TILE_SIZE / 2);
+                    ctx.lineTo(px + TILE_SIZE / 2, py + TILE_SIZE - 10);
+                    ctx.lineTo(px + 10, py + TILE_SIZE / 2);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                } else if (tile === ORES.DIAMOND) {
+                    ctx.fillStyle = "#00E5FF";
+                    ctx.beginPath();
+                    ctx.moveTo(px + TILE_SIZE / 2, py + 8); 
+                    ctx.lineTo(px + TILE_SIZE - 8, py + TILE_SIZE / 2); 
+                    ctx.lineTo(px + TILE_SIZE / 2, py + TILE_SIZE - 8); 
+                    ctx.lineTo(px + 8, py + TILE_SIZE / 2); 
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+                    ctx.beginPath();
+                    ctx.moveTo(px + TILE_SIZE / 2, py + 10);
+                    ctx.lineTo(px + TILE_SIZE / 2 + 5, py + 15);
+                    ctx.lineTo(px + TILE_SIZE / 2, py + 20);
+                    ctx.lineTo(px + TILE_SIZE / 2 - 5, py + 15);
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (tile === ORES.DIRT) {
+                    // Dirt just uses its base color
+                }
+            }
+
+
+            sellAll() {
+                let total = 0;
+                const lootMultiplier = 1.0 + (this.player.lootLevel * 0.15); 
+                
+                // Only sell valuable items (val > 0)
+                const itemsToSell = this.player.inventory.filter(i => i.val > 0);
+                
+                itemsToSell.forEach(i => total += i.val);
+                
+                const finalEarning = Math.floor(total * lootMultiplier);
+                
+                if (total > 0) {
+                    this.player.money += finalEarning;
+                    const itemsSold = itemsToSell.length;
+                    
+                    // Remove only the items that were sold
+                    this.player.inventory = this.player.inventory.filter(i => i.val <= 0);
+
+                    this.showMessage(`Sold ${itemsSold} items for $${finalEarning}!`, ORES.GOLD.color);
+                } else {
+                    this.showMessage("Inventory Empty of sellable ore!", "#fff");
+                }
+                
+                this.updateShopUI();
+                this.updateUI();
+                this.drawInventory(); // Update inventory list if it's open
+            }
+
+            // --- Pickaxe Crafting ---
+            drawPickaxeUpgrades() {
+                const container = document.getElementById('pickaxe-upgrades');
+                container.innerHTML = '';
+                
+                let pickaxeUpgradeContent = '';
+                let nextLevelFound = false;
+                
+                PICKAXE_BLUEPRINTS.forEach(blueprint => {
+                    const isCurrentLevel = this.player.pickaxeLevel === blueprint.level;
+                    const isNextLevel = this.player.pickaxeLevel === blueprint.level - 1;
+                    
+                    if (this.player.pickaxeLevel >= blueprint.level) {
+                        pickaxeUpgradeContent += `
+                            <button class="btn-disabled">
+                                ${blueprint.name} (Lvl ${blueprint.level}) - **OWNED**
+                            </button>
+                        `;
+                        return;
+                    }
+                    
+                    // Stop listing upgrades once a craftable one is found (or if we jump levels)
+                    if (!isNextLevel && nextLevelFound) return;
+                    nextLevelFound = true; 
+                    
+                    let canAffordCash = this.player.money >= blueprint.cashCost;
+                    let missingMaterials = [];
+                    
+                    blueprint.requirements.forEach(req => {
+                        const have = this.getInventoryCount(req.material);
+                        if (have < req.qty) {
+                            missingMaterials.push(`${req.qty} ${req.material.name} (Need: ${req.qty}, Have: ${have})`);
+                        }
+                    });
+                    
+                    const isAffordable = canAffordCash && missingMaterials.length === 0;
+
+                    let buttonText = `CRAFT ${blueprint.name} (Lvl ${blueprint.level})<br>`;
+                    
+                    if (isAffordable) {
+                        buttonText += `<span style="font-size:11px; font-weight:normal;">Cost: $${blueprint.cashCost} + Materials.</span>`;
+                    } else {
+                        let missingText = `Missing: $${Math.max(0, blueprint.cashCost - this.player.money)} (Cash)`;
+                        if (missingMaterials.length > 0) {
+                            missingText += `<br>${missingMaterials.join('<br>')}`;
+                        }
+                        buttonText += `<span style="font-size:11px; font-weight:normal; color:#f00;">${missingText}</span>`;
+                    }
+                    
+                    const buttonAction = `game.craftPickaxe(${blueprint.level})`;
+                    const buttonClass = isAffordable ? 'btn-craft' : 'btn-disabled';
+
+                    pickaxeUpgradeContent += `
+                        <button onclick="${isAffordable ? buttonAction : ''}" class="${buttonClass}">
+                            ${buttonText}
+                        </button>
+                    `;
+                });
+                
+                container.innerHTML = pickaxeUpgradeContent;
+            }
+
+            craftPickaxe(level) {
+                if (this.player.pickaxeLevel !== level - 1) return; 
+                
+                const blueprint = PICKAXE_BLUEPRINTS.find(b => b.level === level);
+                if (!blueprint) return;
+
+                let canAfford = this.player.money >= blueprint.cashCost;
+
+                blueprint.requirements.forEach(req => {
+                    if (this.getInventoryCount(req.material) < req.qty) {
+                        canAfford = false;
+                    }
+                });
+                
+                if (canAfford) {
+                    
+                    // Deduct costs
+                    this.player.money -= blueprint.cashCost;
+                    blueprint.requirements.forEach(req => {
+                        this.removeItemsFromInventory(req.material, req.qty);
+                    });
+                    
+                    // Upgrade
+                    this.player.pickaxeLevel = level;
+                    this.showMessage(`Crafted ${blueprint.name}!`, ORES.COPPER.color);
+                    
+                    // Update UI
+                    this.updateShopUI();
+                    this.drawPickaxeUpgrades();
+                    this.drawInventory(); // Update inventory after crafting
+                } else {
+                    this.showMessage("Missing required materials or cash!", "#ff4444");
+                }
+            }
+
+
+            upgradeTank() {
+                if (this.player.tankLevel >= 10) { 
+                    this.showMessage("Battery is Max Level (10)!", "#00e5ff");
+                    return;
+                }
+                
+                if (this.player.money >= this.costs.tank) {
+                    this.player.money -= this.costs.tank;
+                    this.player.maxEnergy += 25;
+                    this.player.energy = this.player.maxEnergy; 
+                    this.player.tankLevel++;
+                    this.costs.tank = Math.floor(this.costs.tank * 1.5);
+                    this.updateShopUI();
+                    this.updateUI();
+                } else { this.showMessage("Not enough cash!", "#ff4444"); }
+            }
+
+            upgradeScanner() {
+                if (this.player.scannerLevel >= MAX_SCANNER_LEVEL) {
+                     this.showMessage(`Scanner is Max Level (${MAX_SCANNER_LEVEL} blocks)!`, "#00E5FF");
+                     return;
+                }
+                
+                if (this.player.money >= this.costs.scanner) {
+                    this.player.money -= this.costs.scanner;
+                    this.player.scannerLevel++;
+                    this.costs.scanner = Math.floor(this.costs.scanner * this.scanner_cost_multiplier);
+                    const newRadius = BASE_VISIBILITY_RADIUS + this.player.scannerLevel;
+                    this.showMessage(`Scanner Level ${this.player.scannerLevel}! Radius: ${newRadius}`, "#00E5FF");
+                    this.updateVisibility(); 
+                    this.updateShopUI();
+                    this.updateUI();
+                } else { this.showMessage("Not enough cash!", "#ff4444"); }
+            }
+            
+            upgradeLuck() {
+                if (this.player.luckLevel >= 10) { 
+                    this.showMessage("Luck is Max Level (10)!", "#00e5ff");
+                    return;
+                }
+                
+                if (this.player.money >= this.costs.luck) {
+                    this.player.money -= this.costs.luck;
+                    this.player.luckLevel++;
+                    this.costs.luck = Math.floor(this.costs.luck * 1.8);
+                    this.showMessage(`Luck Level ${this.player.luckLevel}!`, "#00e5ff");
+                    this.updateShopUI();
+                    this.updateUI();
+                } else { this.showMessage("Not enough cash!", "#ff4444"); }
+            }
+
+            upgradeLoot() {
+                if (this.player.lootLevel >= 10) { 
+                    this.showMessage("Loot is Max Level (10)!", "#00e5ff");
+                    return;
+                }
+                
+                if (this.player.money >= this.costs.loot) {
+                    this.player.money -= this.costs.loot;
+                    this.player.lootLevel++;
+                    this.costs.loot = Math.floor(this.costs.loot * 1.6);
+                    this.showMessage(`Loot Multiplier Level ${this.player.lootLevel}!`, ORES.GOLD.color);
+                    this.updateShopUI();
+                    this.updateUI();
+                } else { this.showMessage("Not enough cash!", "#ff4444"); }
+            }
+
+            // --- UI/Drawing ---
+            updateShopUI() {
+                document.getElementById('shop-money').innerText = this.player.money;
+                
+                document.getElementById('lvl-tank').innerText = this.player.tankLevel;
+                document.getElementById('cost-tank').innerText = this.costs.tank;
+                
+                document.getElementById('lvl-scanner').innerText = this.player.scannerLevel;
+                document.getElementById('cost-scanner').innerText = this.costs.scanner;
+                
+                document.getElementById('lvl-luck').innerText = this.player.luckLevel;
+                document.getElementById('cost-luck').innerText = this.costs.luck;
+                
+                document.getElementById('lvl-loot').innerText = this.player.lootLevel;
+                document.getElementById('cost-loot').innerText = this.costs.loot;
+            }
+
+            updateUI() {
+                document.getElementById('ui-money').innerText = this.player.money;
+                document.getElementById('ui-health').innerText = this.player.health.toFixed(1); 
+                document.getElementById('ui-energy').innerText = Math.floor(this.player.energy);
+                document.getElementById('ui-max-energy').innerText = this.player.maxEnergy;
+                document.getElementById('ui-depth').innerText = Math.max(0, this.player.y - SURFACE_HEIGHT);
+                document.getElementById('ui-weight').innerText = this.totalWeight.toFixed(0); 
+                document.getElementById('ui-blocks-mined').innerText = this.player.blocksMinedSinceRest;
+                document.getElementById('ui-pickaxe-level').innerText = PICKAXE_NAMES[this.player.pickaxeLevel]; 
+            }
+
+            showMessage(text, color="#fff") {
+                const el = document.getElementById('message-area');
+                el.innerText = text;
+                el.style.color = color;
+                el.style.opacity = 1;
+                clearTimeout(this.msgTimer);
+                this.msgTimer = setTimeout(() => el.style.opacity = 0, 1500);
+            }
+
+            gameLoop(timestamp) {
+                if (!this.paused) {
+                    this.update(timestamp);
+                    this.draw();
+                }
+                requestAnimationFrame(this.gameLoop.bind(this));
+            }
+
+            update(timestamp) {
+                let targetCamY;
+                const playerYPos = this.player.y * TILE_SIZE;
+
+                if (this.player.y <= SURFACE_HEIGHT) {
+                    targetCamY = 0; 
+                } else {
+                    targetCamY = playerYPos - (canvas.height / 2);
+                }
+
+                const maxCamY = (TOTAL_WORLD_HEIGHT * TILE_SIZE) - canvas.height;
+                this.cameraY = Math.max(0, Math.min(targetCamY, maxCamY));
+                
+                this.updateUI();
+            }
+
+            draw() {
+                ctx.fillStyle = "#87CEEB"; 
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                const marginX = (canvas.width - (WORLD_WIDTH * TILE_SIZE)) / 2;
+                ctx.translate(marginX, -this.cameraY);
+
+                const startRow = Math.floor(this.cameraY / TILE_SIZE);
+                const endRow = startRow + (canvas.height / TILE_SIZE) + 2;
+
+                for (let y = startRow; y < Math.min(endRow, TOTAL_WORLD_HEIGHT); y++) {
+                    for (let x = 0; x < WORLD_WIDTH; x++) {
+                        
+                        const tile = this.visibleGrid[y][x]; 
+                        const px = x * TILE_SIZE;
+                        const py = y * TILE_SIZE;
+
+                        if (tile && tile !== ORES.AIR) {
+                            ctx.fillStyle = tile.color;
+                            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+                            
+                            // Draw structure icons
+                            if (tile.id >= STRUCTURES.GROUND.id && tile.id <= STRUCTURE_ID_REST) {
+                                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                                ctx.font = "bold 16px Courier New";
+                                ctx.textAlign = "center";
+                                
+                                if (tile.id === STRUCTURE_ID_SELL) {
+                                    ctx.fillText("$", px + TILE_SIZE / 2, py + TILE_SIZE / 2 + 5);
+                                } else if (tile.id === STRUCTURE_ID_UPGRADE) {
+                                    ctx.fillText("U", px + TILE_SIZE / 2, py + TILE_SIZE / 2 + 5);
+                                } else if (tile.id === STRUCTURE_ID_REST) {
+                                    ctx.fillText("Zz", px + TILE_SIZE / 2, py + TILE_SIZE / 2 + 5);
+                                }
+                            }
+
+                            ctx.strokeStyle = "rgba(0,0,0,0.2)";
+                            ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+                            
+                            // Durability indicator 
+                            const actualTileData = this.grid[y][x];
+                            if (actualTileData && actualTileData.type && actualTileData.type.hardness > 0 && tile !== ORES.UNEXPLORED) {
+                                
+                                const currentHardness = actualTileData.currentHardness;
+                                const maxHardness = actualTileData.type.hardness;
+                                
+                                if (currentHardness > 0 && currentHardness < maxHardness) {
+                                    const damageRatio = currentHardness / maxHardness;
+                                    
+                                    // Draw damage bar background
+                                    ctx.fillStyle = "rgba(0,0,0,0.4)";
+                                    ctx.fillRect(px + 4, py + 34, TILE_SIZE - 8, 3);
+                                    
+                                    // Draw remaining health/durability
+                                    ctx.fillStyle = `hsl(${damageRatio * 120}, 100%, 50%)`; // Green to Red
+                                    ctx.fillRect(px + 4, py + 34, (TILE_SIZE - 8) * damageRatio, 3);
+                                }
+                            }
+                            
+                            // --- DETAILED ORE ICONS ---
+                            this.drawOreIcon(ctx, px, py, tile);
+                        }
+                    }
+                }
+
+                // Draw Player 
+                const px = this.player.x * TILE_SIZE;
+                const py = this.player.y * TILE_SIZE;
+
+                ctx.fillStyle = "#eee";
+                ctx.fillRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+                
+                ctx.fillStyle = "#333";
+                ctx.fillRect(px + 2, py + 28, TILE_SIZE - 4, 8); 
+                
+                // Draw the drill/pickaxe tip
+                ctx.fillStyle = PICKAXE_NAMES[this.player.pickaxeLevel] === 'Copper' ? ORES.COPPER.color : 
+                                PICKAXE_NAMES[this.player.pickaxeLevel] === 'Iron' ? ORES.IRON.color : "#aaa";
+                ctx.beginPath();
+                ctx.moveTo(px + TILE_SIZE / 2, py + TILE_SIZE / 2); 
+                
+                const tipX = px + TILE_SIZE / 2 + (this.player.facing.x * TILE_SIZE / 2);
+                const tipY = py + TILE_SIZE / 2 + (this.player.facing.y * TILE_SIZE / 2);
+
+                if (this.player.facing.x !== 0) {
+                    ctx.lineTo(tipX, py + 5);
+                    ctx.lineTo(tipX, py + TILE_SIZE - 5);
+                } else {
+                    ctx.lineTo(px + 5, tipY);
+                    ctx.lineTo(px + TILE_SIZE - 5, tipY);
+                }
+
+                ctx.fill();
+
+
+                ctx.restore();
+            }
+        }
+
+        const game = new Game();
+
+    </script>
+</body>
+</html>
